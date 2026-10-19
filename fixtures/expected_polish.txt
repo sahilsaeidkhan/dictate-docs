@@ -1,0 +1,3 @@
+Exponential backoff with jitter for failed requests. I fixed the timeout bug where it would hang forever, on slow networks. I added tests for the retry path.
+
+I made the timeout configurable instead of hardcoded at 30 seconds. The main thing is the retry helper is now reusable across the codebase.

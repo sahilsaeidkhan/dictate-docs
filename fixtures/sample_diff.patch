@@ -1,0 +1,73 @@
+diff --git a/dictate_docs/retry.py b/dictate_docs/retry.py
+new file mode 100644
+index 0000000..3f2a1b4
+--- /dev/null
++++ b/dictate_docs/retry.py
+@@ -0,0 +1,45 @@
++"""Exponential backoff retries for the API client."""
++import random
++import time
++
++
++def with_retry(fn, attempts=3, base_delay=1.0, jitter=True):
++    """Run fn, retrying with exponential backoff on failure."""
++    last_exc = None
++    for i in range(attempts):
++        try:
++            return fn()
++        except Exception as exc:  # noqa: BLE001
++            last_exc = exc
++            delay = base_delay * (2 ** i)
++            if jitter:
++                delay *= random.uniform(0.5, 1.5)
++            time.sleep(delay)
++    raise last_exc
++
++
++class RetryConfig:
++    def __init__(self, attempts=3, base_delay=1.0, jitter=True):
++        self.attempts = attempts
++        self.base_delay = base_delay
++        self.jitter = jitter
+diff --git a/dictate_docs/client.py b/dictate_docs/client.py
+index 1a2b3c4..5d6e7f8 100644
+--- a/dictate_docs/client.py
++++ b/dictate_docs/client.py
+@@ -12,7 +12,7 @@ class APIClient:
+     def get(self, path):
+-        resp = self._session.get(path, timeout=30)
++        resp = self._session.get(path, timeout=self.timeout)
+         return resp
+@@ -28,6 +28,10 @@ class APIClient:
+     def post(self, path, payload):
++        # guard against hanging forever on slow networks
++        if self.timeout is None:
++            self.timeout = 30
+         resp = self._session.post(path, payload, timeout=self.timeout)
+         return resp
+diff --git a/tests/test_retry.py b/tests/test_retry.py
+new file mode 100644
+index 0000000..9a8b7c6
+--- /dev/null
++++ b/tests/test_retry.py
+@@ -0,0 +1,18 @@
++import pytest
++from dictate_docs.retry import with_retry
++
++
++def test_retry_succeeds_after_failures():
++    calls = []
++
++    def flaky():
++        calls.append(1)
++        if len(calls) < 3:
++            raise ConnectionError("boom")
++        return "ok"
++
++    assert with_retry(flaky, attempts=3, base_delay=0) == "ok"
++
++
++def test_retry_raises_after_attempts():
++    with pytest.raises(ConnectionError):
++        with_retry(lambda: (_ for _ in ()).throw(ConnectionError()),
++                   attempts=2, base_delay=0)

@@ -1,0 +1,8 @@
+feat(dictate_docs): add exponential backoff with jitter for failed requests
+
+- Fix the timeout bug where it would hang forever, on slow networks.
+- Add tests for the retry path.
+- Make the timeout configurable instead of hardcoded at 30 seconds.
+- The main thing is the retry helper is now reusable across the codebase.
+
+3 file(s) changed, +49 -1
