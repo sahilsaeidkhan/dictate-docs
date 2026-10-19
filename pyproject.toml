@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dictate-docs"
+version = "0.1.0"
+description = "Voice-first dev tool: dictated notes -> polished commit messages and README sections"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Sahil Saeid" }]
+dependencies = []  # stdlib only at runtime
+
+[project.scripts]
+dictate-docs = "dictate_docs.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["dictate_docs*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,3 @@
+# dictate-docs runs on the Python standard library only.
+# This file lists development/test dependencies.
+pytest>=8
