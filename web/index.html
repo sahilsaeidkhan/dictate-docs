@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dictate-docs — voice-first dev docs</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --amber: #d29922;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 18px; margin: 0; font-weight: 650; }
+  header h1 .mic-emoji { margin-right: 6px; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  #backend-badge {
+    margin-left: auto; font-size: 12px; padding: 4px 10px;
+    border: 1px solid var(--border); border-radius: 20px; color: var(--muted);
+  }
+  #backend-badge.local { color: var(--green); border-color: var(--green); }
+  #backend-badge.llm { color: var(--amber); border-color: var(--amber); }
+  main {
+    flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    min-height: 0;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .pane { padding: 18px 24px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .pane + .pane { border-left: 1px solid var(--border); }
+  .tabs { display: flex; gap: 8px; }
+  .tab {
+    padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--panel); color: var(--muted); cursor: pointer; font-size: 14px;
+  }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #04101f; font-weight: 600; }
+  label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  textarea {
+    width: 100%; background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13.5px; padding: 12px; resize: vertical; line-height: 1.55;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  #notes { min-height: 220px; }
+  #extra { min-height: 120px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  button.action {
+    padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px;
+    font-weight: 600; cursor: pointer; background: var(--green); color: #04140a;
+  }
+  button.action:disabled { opacity: .5; cursor: wait; }
+  button.ghost {
+    padding: 10px 16px; border: 1px solid var(--border); border-radius: 8px;
+    background: transparent; color: var(--text); font-size: 14px; cursor: pointer;
+  }
+  button.ghost.recording { border-color: var(--red); color: var(--red); }
+  #output {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13.5px; white-space: pre-wrap; word-break: break-word;
+    min-height: 300px; flex: 1; overflow: auto; line-height: 1.6;
+  }
+  #output .placeholder { color: var(--muted); font-family: inherit; }
+  #status { font-size: 12px; color: var(--muted); min-height: 16px; }
+  footer {
+    padding: 12px 24px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 12px;
+  }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="mic-emoji">🎙️</span>dictate-docs</h1>
+  <span class="sub">dictate messy dev notes → get polished commits &amp; READMEs</span>
+  <span id="backend-badge" title="Which engine processed your text">…</span>
+</header>
+
+<main>
+  <section class="pane">
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-mode="commit">Commit message</button>
+      <button class="tab" data-mode="readme">README sections</button>
+      <button class="tab" data-mode="polish">Polish text</button>
+    </div>
+
+    <div class="row">
+      <button id="mic" class="ghost" title="Dictate with your browser mic (Web Speech API)">🎤 Dictate</button>
+      <button id="paste-sample" class="ghost" title="Load a messy dictated sample">Load sample</button>
+    </div>
+
+    <label for="notes">Dictated notes <span style="text-transform:none">(paste from Wispr Flow / any voice app, or dictate above)</span></label>
+    <textarea id="notes" placeholder="um so basically I added retry logic to the api client, no wait, exponential backoff with jitter…"></textarea>
+
+    <div id="extra-commit">
+      <label for="extra">Diff <span style="text-transform:none">(paste `git diff` output — optional)</span></label>
+      <textarea id="extra" placeholder="paste unified diff here, or leave empty"></textarea>
+    </div>
+    <div id="extra-readme" class="hidden">
+      <label for="extra2">Existing README <span style="text-transform:none">(optional — sections get merged, not overwritten)</span></label>
+      <textarea id="extra2" placeholder="paste existing README to update it"></textarea>
+    </div>
+
+    <div class="row">
+      <button id="go" class="action">Generate →</button>
+      <span id="status"></span>
+    </div>
+  </section>
+
+  <section class="pane">
+    <div class="row">
+      <label style="margin:0">Output</label>
+      <button id="copy" class="ghost" style="margin-left:auto">📋 Copy</button>
+    </div>
+    <div id="output"><span class="placeholder">Your polished output appears here…</span></div>
+  </section>
+</main>
+
+<footer>
+  Input is plain text from any dictation app (e.g. Wispr Flow) — no audio ever leaves your machine through this tool.
+  The default engine is a local, offline heuristic processor: filler stripping, self-correction resolution, conventional-commit inference.
+  Set <code>DICTATE_DOCS_LLM</code> + <code>DICTATE_DOCS_API_KEY</code> to plug in an OpenAI-compatible LLM instead.
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+let mode = "commit";
+
+// ---- backend badge (honest about which engine is active) ----
+fetch("/api/status").then(r => r.json()).then(s => {
+  const b = $("backend-badge");
+  const isLocal = s.backend === "local";
+  b.textContent = isLocal
+    ? "● local offline engine"
+    : "● LLM: " + s.backend + " (" + s.model + ")";
+  b.classList.add(isLocal ? "local" : "llm");
+}).catch(() => { $("backend-badge").textContent = "● engine unknown"; });
+
+// ---- tabs ----
+document.querySelectorAll(".tab").forEach(t => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+    t.classList.add("active");
+    mode = t.dataset.mode;
+    $("extra-commit").classList.toggle("hidden", mode !== "commit");
+    $("extra-readme").classList.toggle("hidden", mode !== "readme");
+  });
+});
+
+// ---- sample dictated text (deliberately messy) ----
+const SAMPLES = {
+  commit: "um so basically I added retry logic to the api client, no wait, exponential backoff with jitter for failed requests, and uh I also fixed the timeout bug where it would hang forever, like literally forever, on slow networks. oh and I added tests for the retry path.",
+  readme: "okay so the project is called dictate docs, it's a, um, voice first dev tool that turns dictated notes into polished commit messages and readme sections. first, you dictate messy notes with fillers and self corrections. second, the offline engine strips the fillers and resolves corrections. third, you get a conventional commit message or readme sections. to install you just clone the repo and run python minus m dictate docs. usage is dictate docs commit minus minus notes quote your notes quote.",
+  polish: "so basically, um, the new cache layer is, like, really fast, you know, and it handles, uh, thousands of requests per second — no wait, tens of thousands per second under load, at the end of the day."
+};
+$("paste-sample").addEventListener("click", () => {
+  $("notes").value = SAMPLES[mode];
+});
+
+// ---- browser-mic dictation via Web Speech API ----
+let rec = null, recognizing = false, micBase = "";
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (!SR) {
+  $("mic").disabled = true;
+  $("mic").title = "Browser mic dictation not supported in this browser";
+} else {
+  rec = new SR();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = "en-US";
+  rec.onresult = e => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) micBase += t + " ";
+      else interim += t;
+    }
+    $("notes").value = (micBase + interim).trim();
+  };
+  rec.onend = () => { recognizing = false; paintMic(); };
+  rec.onerror = e => { $("status").textContent = "mic error: " + e.error; };
+}
+function paintMic() {
+  $("mic").textContent = recognizing ? "⏹ Stop dictating" : "🎤 Dictate";
+  $("mic").classList.toggle("recording", recognizing);
+}
+$("mic").addEventListener("click", () => {
+  if (!rec) return;
+  if (recognizing) { rec.stop(); return; }
+  micBase = $("notes").value ? $("notes").value.trim() + " " : "";
+  try { rec.start(); recognizing = true; paintMic(); $("status").textContent = "listening…"; }
+  catch (e) { $("status").textContent = "mic busy, try again"; }
+});
+
+// ---- generate ----
+$("go").addEventListener("click", async () => {
+  const btn = $("go");
+  btn.disabled = true;
+  $("status").textContent = "processing…";
+  const body = { mode, text: $("notes").value };
+  if (mode === "commit") body.diff = $("extra").value;
+  if (mode === "readme") body.readme = $("extra2").value;
+  try {
+    const r = await fetch("/api/process", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    $("output").textContent = data.output || "(empty output)";
+    $("status").textContent = "done · engine: " + data.backend;
+  } catch (e) {
+    $("status").textContent = "error: " + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---- copy ----
+$("copy").addEventListener("click", async () => {
+  const text = $("output").textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+    $("status").textContent = "copied ✓";
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); ta.remove();
+    $("status").textContent = "copied ✓";
+  }
+});
+</script>
+</body>
+</html>
